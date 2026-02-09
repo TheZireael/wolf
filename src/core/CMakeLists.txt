@@ -55,8 +55,8 @@ if (UNIX AND NOT APPLE)
     else ()
         FetchContent_Declare(
                 inputtino
-                GIT_REPOSITORY https://github.com/games-on-whales/inputtino.git
-                GIT_TAG fd136cf)
+                GIT_REPOSITORY https://github.com/TheZireael/inputtino.git
+                GIT_TAG main)
         FetchContent_MakeAvailable(inputtino)
     endif ()
 
