@@ -8,6 +8,7 @@ enum class ControllerType {
   XBOX,
   PS,
   NINTENDO,
+  ULTIMATE2,
   AUTO
 };
 

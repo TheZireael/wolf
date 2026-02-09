@@ -159,6 +159,8 @@ static moonlight::control::pkts::CONTROLLER_TYPE get_controller_type(const Contr
     return moonlight::control::pkts::CONTROLLER_TYPE::PS;
   case ControllerType::NINTENDO:
     return moonlight::control::pkts::CONTROLLER_TYPE::NINTENDO;
+  case ControllerType::ULTIMATE2:
+    return moonlight::control::pkts::CONTROLLER_TYPE::AUTO;
   case ControllerType::AUTO:
     return moonlight::control::pkts::CONTROLLER_TYPE::AUTO;
   }

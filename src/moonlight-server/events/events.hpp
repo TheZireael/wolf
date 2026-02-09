@@ -221,7 +221,7 @@ struct DockerContainerStopped {
 using MouseTypes = std::variant<input::Mouse, virtual_display::WaylandMouse>;
 using KeyboardTypes = std::variant<input::Keyboard, virtual_display::WaylandKeyboard>;
 using TouchScreenTypes = std::variant<input::TouchScreen, virtual_display::WaylandTouchScreen>;
-using JoypadTypes = std::variant<input::XboxOneJoypad, input::SwitchJoypad, input::PS5Joypad>;
+using JoypadTypes = std::variant<input::XboxOneJoypad, input::SwitchJoypad, input::PS5Joypad, input::Ultimate2Joypad>;
 using JoypadList = immer::map<int /* controller number */, std::shared_ptr<JoypadTypes>>;
 
 enum class ColorRange {

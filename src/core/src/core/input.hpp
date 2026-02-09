@@ -87,4 +87,12 @@ public:
   std::vector<std::map<std::string, std::string>> get_udev_events() const override;
   std::vector<std::pair<std::string, std::vector<std::string>>> get_udev_hw_db_entries() const override;
 };
+
+class Ultimate2Joypad : public inputtino::Ultimate2Joypad, public VirtualDevice {
+public:
+  Ultimate2Joypad(inputtino::Ultimate2Joypad &&j) noexcept : inputtino::Ultimate2Joypad(std::move(j)) {}
+
+  std::vector<std::map<std::string, std::string>> get_udev_events() const override;
+  std::vector<std::pair<std::string, std::vector<std::string>>> get_udev_hw_db_entries() const override;
+};
 } // namespace wolf::core::input

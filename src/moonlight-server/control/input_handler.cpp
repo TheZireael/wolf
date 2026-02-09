@@ -69,6 +69,10 @@ std::shared_ptr<events::JoypadTypes> create_new_joypad(const events::StreamSessi
     case NINTENDO:
       final_type = wolf::config::ControllerType::NINTENDO;
       break;
+    case UNKNOWN:
+    case AUTO:
+      final_type = wolf::config::ControllerType::AUTO;
+      break;
     default:
       final_type = wolf::config::ControllerType::AUTO;
       break;
@@ -126,6 +130,21 @@ std::shared_ptr<events::JoypadTypes> create_new_joypad(const events::StreamSessi
     }
     break;
   }
+  case wolf::config::ControllerType::ULTIMATE2: {
+    logs::log(logs::info, "Creating 8BitDo Ultimate 2 joypad for controller {}", controller_number);
+    auto result = Ultimate2Joypad::create({.name = "8BitDo Ultimate 2 (virtual) pad",
+                                           .vendor_id = 0x2DC8,
+                                           .product_id = 0x6012,
+                                           .version = 0x0100});
+    if (!result) {
+      logs::log(logs::error, "Failed to create Ultimate 2 joypad: {}", result.getErrorMessage());
+      return {};
+    } else {
+      (*result).set_on_rumble(on_rumble_fn);
+      new_pad = std::make_shared<events::JoypadTypes>(std::move(*result));
+    }
+    break;
+  }
   case wolf::config::ControllerType::NINTENDO:
     logs::log(logs::info, "Creating Nintendo joypad for controller {}", controller_number);
     auto result = SwitchJoypad::create({.name = "Wolf Nintendo (virtual) pad",
@@ -143,7 +162,8 @@ std::shared_ptr<events::JoypadTypes> create_new_joypad(const events::StreamSessi
     break;
   }
 
-  if (capabilities & ACCELEROMETER && final_type == wolf::config::ControllerType::PS) {
+  if (capabilities & ACCELEROMETER &&
+      (final_type == wolf::config::ControllerType::PS || final_type == wolf::config::ControllerType::ULTIMATE2)) {
     // Request acceleromenter events from the client at 100 Hz
     logs::log(logs::info, "Requesting accelerometer events for controller {}", controller_number);
     auto accelerometer_pkt = ControlMotionEventPacket{
@@ -155,7 +175,8 @@ std::shared_ptr<events::JoypadTypes> create_new_joypad(const events::StreamSessi
     encrypt_and_send(plaintext, session.aes_key, connected_client);
   }
 
-  if (capabilities & GYRO && final_type == wolf::config::ControllerType::PS) {
+  if (capabilities & GYRO &&
+      (final_type == wolf::config::ControllerType::PS || final_type == wolf::config::ControllerType::ULTIMATE2)) {
     // Request gyroscope events from the client at 100 Hz
     logs::log(logs::info, "Requesting gyroscope events for controller {}", controller_number);
     auto gyro_pkt = ControlMotionEventPacket{
@@ -682,6 +703,17 @@ void controller_motion(const CONTROLLER_MOTION_PACKET &pkt, events::StreamSessio
         std::get<PS5Joypad>(*selected_pad)
             .set_motion(inputtino::PS5Joypad::GYROSCOPE, deg2rad(x), deg2rad(y), deg2rad(z));
       }
+    } else if (std::holds_alternative<Ultimate2Joypad>(*selected_pad)) {
+      auto x = utils::from_netfloat(pkt.x);
+      auto y = utils::from_netfloat(pkt.y);
+      auto z = utils::from_netfloat(pkt.z);
+
+      if (pkt.motion_type == ACCELERATION) {
+        std::get<Ultimate2Joypad>(*selected_pad).set_motion(inputtino::Ultimate2Joypad::ACCELERATION, x, y, z);
+      } else if (pkt.motion_type == GYROSCOPE) {
+        std::get<Ultimate2Joypad>(*selected_pad)
+            .set_motion(inputtino::Ultimate2Joypad::GYROSCOPE, deg2rad(x), deg2rad(y), deg2rad(z));
+      }
     }
   }
 }
@@ -712,6 +744,10 @@ void controller_battery(const CONTROLLER_BATTERY_PACKET &pkt, events::StreamSess
       }
       if (pkt.battery_percentage != BATTERY_PERCENTAGE_UNKNOWN) {
         std::get<PS5Joypad>(*selected_pad).set_battery(state, pkt.battery_percentage);
+      }
+    } else if (std::holds_alternative<Ultimate2Joypad>(*selected_pad)) {
+      if (pkt.battery_percentage != BATTERY_PERCENTAGE_UNKNOWN) {
+        std::get<Ultimate2Joypad>(*selected_pad).set_battery(pkt.battery_percentage);
       }
     }
   }
