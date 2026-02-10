@@ -56,7 +56,7 @@ if (UNIX AND NOT APPLE)
         FetchContent_Declare(
                 inputtino
                 GIT_REPOSITORY https://github.com/TheZireael/inputtino.git
-                GIT_TAG main)
+                GIT_TAG 00ca54c)
         FetchContent_MakeAvailable(inputtino)
     endif ()
 
