@@ -1,5 +1,7 @@
 ARG BASE_IMAGE=ghcr.io/games-on-whales/gstreamer:1.26.7
 ########################################################
+FROM inputtino AS inputtino
+########################################################
 FROM $BASE_IMAGE AS wolf-builder
 
 ENV DEBIAN_FRONTEND=noninteractive
@@ -50,7 +52,6 @@ _GST_WAYLAND_DISPLAY
 
 COPY . /wolf/
 
-ARG INPUTTINO_CACHEBUST=1
 COPY --from=inputtino . /wolf/inputtino
 
 WORKDIR /wolf
