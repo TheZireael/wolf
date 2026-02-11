@@ -586,10 +586,78 @@ void controller_arrival(const CONTROLLER_ARRIVAL_PACKET &pkt,
                         immer::box<std::shared_ptr<ENetPeer>> connected_client) {
   auto joypads = session.joypads->load();
   if (joypads->find(pkt.controller_number)) {
-    // TODO: should we replace it instead?
     logs::log(logs::debug,
-              "[INPUT] Received CONTROLLER_ARRIVAL for controller {} which is already present; skipping...",
+              "[INPUT] Received CONTROLLER_ARRIVAL for controller {} which is already present; refreshing callbacks",
               pkt.controller_number);
+
+    auto on_rumble_fn = ([connected_client, controller_number = pkt.controller_number, aes_key = session.aes_key](
+                             int low_freq,
+                             int high_freq) {
+      auto rumble_pkt = ControlRumblePacket{
+          .header = {.type = RUMBLE_DATA, .length = sizeof(ControlRumblePacket) - sizeof(ControlPacket)},
+          .controller_number = boost::endian::native_to_little((uint16_t)controller_number),
+          .low_freq = boost::endian::native_to_little((uint16_t)low_freq),
+          .high_freq = boost::endian::native_to_little((uint16_t)high_freq)};
+      std::string plaintext = {(char *)&rumble_pkt, sizeof(rumble_pkt)};
+      encrypt_and_send(plaintext, aes_key, connected_client);
+    });
+
+    auto on_led_fn = ([connected_client, controller_number = pkt.controller_number, aes_key = session.aes_key](
+                          int r,
+                          int g,
+                          int b) {
+      auto led_pkt = ControlRGBLedPacket{
+          .header{.type = RGB_LED_EVENT, .length = sizeof(ControlRGBLedPacket) - sizeof(ControlPacket)},
+          .controller_number = boost::endian::native_to_little((uint16_t)controller_number),
+          .r = static_cast<uint8_t>(r),
+          .g = static_cast<uint8_t>(g),
+          .b = static_cast<uint8_t>(b)};
+      std::string plaintext = {(char *)&led_pkt, sizeof(led_pkt)};
+      encrypt_and_send(plaintext, aes_key, connected_client);
+    });
+
+    auto on_adaptive_trigger_fn =
+        ([connected_client, controller_number = pkt.controller_number, aes_key = session.aes_key](
+             const inputtino::PS5Joypad::TriggerEffect &effect) {
+          auto rumble_pkt = ControlAdaptiveTriggerPacket{
+              .header{.type = ADAPTIVE_TRIGGER_EVENT,
+                      .length = sizeof(ControlAdaptiveTriggerPacket) - sizeof(ControlPacket)},
+              .controller_number = boost::endian::native_to_little((uint16_t)controller_number),
+              .effect = effect};
+          std::string plaintext = {(char *)&rumble_pkt, sizeof(rumble_pkt)};
+          encrypt_and_send(plaintext, aes_key, connected_client);
+        });
+
+    std::shared_ptr<events::JoypadTypes> selected_pad = std::move(*joypads->find(pkt.controller_number));
+    std::visit([&](auto &pad) { pad.set_on_rumble(on_rumble_fn); }, *selected_pad);
+    if (std::holds_alternative<PS5Joypad>(*selected_pad)) {
+      std::get<PS5Joypad>(*selected_pad).set_on_led(on_led_fn);
+      std::get<PS5Joypad>(*selected_pad).set_on_trigger_effect(on_adaptive_trigger_fn);
+    }
+
+    if (pkt.capabilities & ACCELEROMETER &&
+        (std::holds_alternative<PS5Joypad>(*selected_pad) || std::holds_alternative<Ultimate2Joypad>(*selected_pad))) {
+      logs::log(logs::info, "Requesting accelerometer events for controller {}", pkt.controller_number);
+      auto accelerometer_pkt = ControlMotionEventPacket{
+          .header{.type = MOTION_EVENT, .length = sizeof(ControlMotionEventPacket) - sizeof(ControlPacket)},
+          .controller_number = static_cast<uint16_t>(pkt.controller_number),
+          .reportrate = 100,
+          .type = ACCELERATION};
+      std::string plaintext = {(char *)&accelerometer_pkt, sizeof(accelerometer_pkt)};
+      encrypt_and_send(plaintext, session.aes_key, connected_client);
+    }
+
+    if (pkt.capabilities & GYRO &&
+        (std::holds_alternative<PS5Joypad>(*selected_pad) || std::holds_alternative<Ultimate2Joypad>(*selected_pad))) {
+      logs::log(logs::info, "Requesting gyroscope events for controller {}", pkt.controller_number);
+      auto gyro_pkt = ControlMotionEventPacket{
+          .header{.type = MOTION_EVENT, .length = sizeof(ControlMotionEventPacket) - sizeof(ControlPacket)},
+          .controller_number = static_cast<uint16_t>(pkt.controller_number),
+          .reportrate = 100,
+          .type = GYROSCOPE};
+      std::string plaintext = {(char *)&gyro_pkt, sizeof(gyro_pkt)};
+      encrypt_and_send(plaintext, session.aes_key, connected_client);
+    }
   } else {
     create_new_joypad(session,
                       connected_client,
