@@ -131,10 +131,10 @@ std::shared_ptr<events::JoypadTypes> create_new_joypad(const events::StreamSessi
   }
   case wolf::config::ControllerType::ULTIMATE2: {
     logs::log(logs::info, "Creating 8BitDo Ultimate 2 joypad for controller {}", controller_number);
-    auto result = Ultimate2Joypad::create({.name = "8BitDo Ultimate 2 (virtual) pad",
+    auto result = Ultimate2Joypad::create({.name = "8BitDo Ultimate 2 Wireless Controller for PC",
                                            .vendor_id = 0x2DC8,
                                            .product_id = 0x6012,
-                                           .version = 0x0001});
+                                           .version = 0x0111});
     if (!result) {
       logs::log(logs::error, "Failed to create Ultimate 2 joypad: {}", result.getErrorMessage());
       return {};
@@ -743,10 +743,6 @@ void controller_battery(const CONTROLLER_BATTERY_PACKET &pkt, events::StreamSess
       }
       if (pkt.battery_percentage != BATTERY_PERCENTAGE_UNKNOWN) {
         std::get<PS5Joypad>(*selected_pad).set_battery(state, pkt.battery_percentage);
-      }
-    } else if (std::holds_alternative<Ultimate2Joypad>(*selected_pad)) {
-      if (pkt.battery_percentage != BATTERY_PERCENTAGE_UNKNOWN) {
-        std::get<Ultimate2Joypad>(*selected_pad).set_battery(pkt.battery_percentage);
       }
     }
   }

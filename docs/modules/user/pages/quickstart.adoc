@@ -727,10 +727,16 @@ KERNEL=="uhid", GROUP="input", MODE="0660", TAG+="uaccess"
 
 # Joypads
 KERNEL=="hidraw*", ATTRS{name}=="Wolf PS5 (virtual) pad", GROUP="input", MODE="0660", ENV{ID_SEAT}="seat9"
+# 8BitDo Ultimate 2 virtual pad: allow Steam/user access to hidraw
+SUBSYSTEM=="hidraw", KERNEL=="hidraw*", KERNELS=="0003:2DC8:6012.*", \
+  ENV{ID_BUS}="usb", ENV{ID_VENDOR_ID}="2dc8", ENV{ID_MODEL_ID}="6012", \
+  ENV{HID_ID}="0003:00002DC8:00006012", ENV{HID_NAME}="8BitDo Ultimate 2 Wireless Controller for PC", \
+  MODE="0660", GROUP="input", TAG+="uaccess"
 SUBSYSTEMS=="input", ATTRS{name}=="Wolf X-Box One (virtual) pad", MODE="0660", ENV{ID_SEAT}="seat9"
 SUBSYSTEMS=="input", ATTRS{name}=="Wolf PS5 (virtual) pad", MODE="0660", ENV{ID_SEAT}="seat9"
 SUBSYSTEMS=="input", ATTRS{name}=="Wolf gamepad (virtual) motion sensors", MODE="0660", ENV{ID_SEAT}="seat9"
 SUBSYSTEMS=="input", ATTRS{name}=="Wolf Nintendo (virtual) pad", MODE="0660", ENV{ID_SEAT}="seat9"
+SUBSYSTEMS=="input", ATTRS{name}=="8BitDo Ultimate 2 Wireless Controller for PC", MODE="0660", ENV{ID_SEAT}="seat9"
 ....
 
 Reload the udev rules either by rebooting or run:

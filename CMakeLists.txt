@@ -67,6 +67,8 @@ set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${CMAKE_CURRENT_SOURCE_DIR}/cmake/)
 include(BoostLoader)
 include(TargetLinkLibrariesSystem)
 
+set(WOLF_CUSTOM_INPUTTINO_SRC "" CACHE PATH "Path to custom inputtino source")
+
 add_subdirectory(src/core)
 add_subdirectory(src/gst-video-context)
 

@@ -308,6 +308,7 @@ The available joypad types are:
 * `xbox`
 * `nintendo`
 * `ps`
+* `ultimate2`
 
 === Input mouse overrides
 
