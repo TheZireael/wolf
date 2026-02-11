@@ -225,6 +225,30 @@ std::vector<std::map<std::string, std::string>> Ultimate2Joypad::get_udev_events
     }
   }
 
+  if (!sys_nodes.empty()) {
+    // Add /dev/hidraw* device
+    // Used by Steam to access the LED status and who knows what else...
+    auto base_path =
+        std::filesystem::path(sys_nodes[0]) // /sys/devices/virtual/misc/uhid/0003:2DC8:6012.XXXX/input/inputXXX
+            .parent_path()                  // "/sys/devices/virtual/misc/uhid/0003:2DC8:6012.XXXX/input/
+            .parent_path();                 // "/sys/devices/virtual/misc/uhid/0003:2DC8:6012.XXXX/
+
+    if (std::filesystem::exists(base_path / "hidraw")) {
+      auto hidraw_entries = std::filesystem::directory_iterator{base_path / "hidraw"};
+      for (auto hidraw_entry : hidraw_entries) {
+        auto dev_path = "/dev/" + hidraw_entry.path().filename().string();
+        auto sys_path = hidraw_entry.path().string();
+        sys_path.erase(0, 4); // Remove leading /sys/ from syspath TODO: what if it's not /sys/?
+
+        auto event = gen_udev_base_event(dev_path, sys_path);
+        event["SUBSYSTEM"] = "hidraw";
+        events.emplace_back(event);
+      }
+    } else {
+      logs::log(logs::warning, "Unable to find HIDRAW nodes for Ultimate2 joypad under {}", base_path.string());
+    }
+  }
+
   return events;
 }
 
