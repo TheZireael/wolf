@@ -55,8 +55,10 @@ enum CONTROLLER_TYPE : uint8_t {
   XBOX = 0x01,
   PS = 0x02,
   NINTENDO = 0x03,
-  ULTIMATE2 = 0x04,
-  AUTO = 0xFF // not part of the protocol, I've added it for simplicity
+  // Values below are NOT part of the Moonlight protocol (which only sends 0x00-0x03).
+  // They are used internally for config-driven controller type overrides.
+  ULTIMATE2 = 0x04, // 8BitDo Ultimate 2 via UHID, only triggered by controllers_override config
+  AUTO = 0xFF       // fall through to Moonlight-requested type
 };
 
 enum CONTROLLER_CAPABILITIES : uint8_t {

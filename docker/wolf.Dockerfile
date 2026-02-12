@@ -15,6 +15,7 @@ RUN apt-get update -y && \
     git \
     clang \
     build-essential \
+    g++-multilib gcc-multilib \
     libboost-thread-dev libboost-locale-dev libboost-filesystem-dev libboost-log-dev libboost-stacktrace-dev libboost-container-dev \
     libwayland-dev libwayland-server0 libinput-dev libxkbcommon-dev libgbm-dev \
     libcurl4-openssl-dev \
@@ -66,9 +67,15 @@ RUN --mount=type=cache,target=/cache/ccache \
     -G Ninja && \
     ninja -C $CMAKE_BUILD_DIR wolf && \
     ninja -C $CMAKE_BUILD_DIR fake-udev && \
+    ninja -C $CMAKE_BUILD_DIR fake-uinput-broker && \
+    ninja -C $CMAKE_BUILD_DIR fake_uinput && \
+    ninja -C $CMAKE_BUILD_DIR fake_uinput_32 && \
     # We have to copy out the built executables because this will only be available inside the buildkit cache
     cp $CMAKE_BUILD_DIR/src/moonlight-server/wolf /wolf/wolf && \
-    cp $CMAKE_BUILD_DIR/src/fake-udev/fake-udev /wolf/fake-udev
+    cp $CMAKE_BUILD_DIR/src/fake-udev/fake-udev /wolf/fake-udev && \
+    cp $CMAKE_BUILD_DIR/src/fake-uinput/fake-uinput-broker /wolf/fake-uinput-broker && \
+    cp $CMAKE_BUILD_DIR/src/fake-uinput/libfake-uinput.so /wolf/libfake-uinput.so && \
+    cp $CMAKE_BUILD_DIR/src/fake-uinput/libfake-uinput32.so /wolf/libfake-uinput32.so
 
 ########################################################
 FROM $BASE_IMAGE AS runner
@@ -106,6 +113,9 @@ ENV WOLF_CFG_FOLDER=/etc/wolf/cfg
 
 COPY --from=wolf-builder /wolf/wolf /wolf/wolf
 COPY --from=wolf-builder /wolf/fake-udev /wolf/fake-udev
+COPY --from=wolf-builder /wolf/fake-uinput-broker /wolf/fake-uinput-broker
+COPY --from=wolf-builder /wolf/libfake-uinput.so /wolf/libfake-uinput.so
+COPY --from=wolf-builder /wolf/libfake-uinput32.so /wolf/libfake-uinput32.so
 
 ENV GST_GL_API=gles2 \
     GST_GL_PLATFORM=egl \

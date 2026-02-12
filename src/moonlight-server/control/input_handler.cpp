@@ -69,7 +69,7 @@ std::shared_ptr<events::JoypadTypes> create_new_joypad(const events::StreamSessi
     case NINTENDO:
       final_type = wolf::config::ControllerType::NINTENDO;
       break;
-    case ULTIMATE2:
+    case ULTIMATE2: // unreachable from Moonlight (0x04 is never sent); kept for completeness
       final_type = wolf::config::ControllerType::ULTIMATE2;
       break;
     default:

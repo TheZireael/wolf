@@ -147,29 +147,32 @@ void RunDocker::run(std::string_view session_id,
   // unfortunately hidraw devices use dynamically assigned major numbers rather than static ones
   // so we'll get the major number from reading `/proc/devices` for `hidraw` and `input`
   // and set the right entries in `DeviceCgroupRules`
+  // Also include `misc` (major 10) for /dev/uinput so Steam Input can create virtual controllers
   {
     auto hidraw_major = get_device_major("hidraw");
     auto input_major = get_device_major("input");
+    auto misc_major = get_device_major("misc");
     if (hidraw_major && input_major) {
       logs::log(logs::debug,
-                "[DOCKER] Setting DeviceCgroupRules for hidraw:{} and input:{}",
+                "[DOCKER] Setting DeviceCgroupRules for hidraw:{}, input:{}, misc:{}",
                 *hidraw_major,
-                *input_major);
+                *input_major,
+                misc_major.value_or("N/A"));
+      auto cgroup_rules = json::array{
+          fmt::format("c {}:* rwm", *hidraw_major),
+          fmt::format("c {}:* rwm", *input_major),
+      };
+      if (misc_major) {
+        cgroup_rules.push_back(json::value(fmt::format("c {}:* rwm", *misc_major)));
+      }
       auto parsed_json = utils::parse_json(final_json_opts).as_object();
       if (auto host_config_ptr = parsed_json.if_contains("HostConfig")) {
         auto host_config = host_config_ptr->as_object();
-        host_config["DeviceCgroupRules"] = json::array{
-            fmt::format("c {}:* rwm", *hidraw_major),
-            fmt::format("c {}:* rwm", *input_major),
-        };
+        host_config["DeviceCgroupRules"] = cgroup_rules;
         parsed_json["HostConfig"] = host_config;
       } else {
         parsed_json["HostConfig"] = json::object{
-            {"DeviceCgroupRules",
-             json::array{
-                 fmt::format("c {}:* rwm", *hidraw_major),
-                 fmt::format("c {}:* rwm", *input_major),
-             }},
+            {"DeviceCgroupRules", cgroup_rules},
         };
       }
       final_json_opts = boost::json::serialize(parsed_json);
@@ -195,6 +198,21 @@ void RunDocker::run(std::string_view session_id,
 
     logs::log(logs::info, "[DOCKER] Starting container: {}", docker_container->name);
     logs::log(logs::debug, "[DOCKER] Starting container: {}", *docker_container);
+
+    // Start the fake-uinput broker daemon (socket-based, creates /dev/input/ nodes on behalf of
+    // the LD_PRELOAD interceptor library loaded into Steam / game processes).
+    // Note: do NOT pass preload_lib_path — common.cpp already bind-mounts /etc/ld.so.preload
+    // with both 64-bit and 32-bit library paths.  Passing it here would overwrite that file
+    // with only the 64-bit path, breaking 32-bit Steam.
+    if (use_fake_udev) {
+      logs::log(logs::info, "[DOCKER] Starting fake-uinput-broker in container {}", container_id);
+      docker_api.exec(container_id,
+                      {"/bin/bash", "-c",
+                       "nohup /usr/bin/fake-uinput-broker"
+                       " /home/retro/.wolf/broker.sock"
+                       " > /home/retro/.wolf/broker.log 2>&1 &"},
+                      "root");
+    }
 
     std::string inspected_hostname;
     if (auto inspected = docker_api.get_by_id(container_id)) {

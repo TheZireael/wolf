@@ -66,10 +66,49 @@ void start_runner(std::shared_ptr<events::Runner> runner,
   full_env.set("PUID", std::to_string(args->client_settings->run_uid));
   full_env.set("PGID", std::to_string(args->client_settings->run_gid));
 
+  // Mount /dev/uinput so Steam Input can create virtual controllers inside the container
+  if (std::filesystem::exists("/dev/uinput")) {
+    all_devices.push_back("/dev/uinput");
+  }
+
   // Add fake-udev and udev mounts
   mounted_paths.push_back(
       {std::filesystem::path(args->host->host_base_state_folder) / "fake-udev", "/usr/bin/fake-udev"});
   mounted_paths.push_back({std::filesystem::path(args->app_host_state_folder) / "udev", "/run/udev/"});
+
+  // Mount fake-uinput broker (listens on socket, creates /dev/input/ nodes for Steam Input)
+  mounted_paths.push_back(
+      {std::filesystem::path(args->host->host_base_state_folder) / "fake-uinput-broker",
+       "/usr/bin/fake-uinput-broker"});
+
+  // Mount LD_PRELOAD interceptor libraries at paths that survive Steam's pressure-vessel
+  // bubblewrap sandbox (which overlays /usr/lib/ but preserves /home/).
+  // Both 64-bit and 32-bit versions are needed because Steam's main process is 32-bit.
+  mounted_paths.push_back(
+      {std::filesystem::path(args->host->host_base_state_folder) / "libfake-uinput.so",
+       "/home/retro/.wolf/libfake-uinput.so"});
+  mounted_paths.push_back(
+      {std::filesystem::path(args->host->host_base_state_folder) / "libfake-uinput32.so",
+       "/home/retro/.wolf/libfake-uinput32.so"});
+  full_env.set("LD_PRELOAD", "/home/retro/.wolf/libfake-uinput.so");
+  full_env.set("WOLF_BROKER_SOCK", "/home/retro/.wolf/broker.sock");
+
+  // Write /etc/ld.so.preload as a bind-mount so the interceptor library is loaded
+  // into EVERY process from the moment the container starts.  This survives
+  // pressure-vessel's bubblewrap sandbox (which rewrites the LD_PRELOAD env var
+  // but preserves /etc/ld.so.preload and /home/ bind-mounts).
+  // Both 64-bit and 32-bit .so paths are listed — the dynamic linker silently
+  // skips libraries whose ELF class doesn't match the process.
+  {
+    auto ld_preload_dir = std::filesystem::path(args->app_host_state_folder) / ".wolf";
+    std::filesystem::create_directories(ld_preload_dir);
+    auto ld_preload_file = ld_preload_dir / "ld.so.preload";
+    std::ofstream f(ld_preload_file);
+    f << "/home/retro/.wolf/libfake-uinput.so\n";
+    f << "/home/retro/.wolf/libfake-uinput32.so\n";
+    f.close();
+    mounted_paths.push_back({ld_preload_file.string(), "/etc/ld.so.preload"});
+  }
 
   /* Finally run the app, this will stop here until over */
   runner->run(args->session_id,
