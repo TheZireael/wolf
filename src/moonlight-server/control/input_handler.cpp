@@ -21,7 +21,8 @@ std::shared_ptr<events::JoypadTypes> create_new_joypad(const events::StreamSessi
                                                        immer::box<std::shared_ptr<ENetPeer>> connected_client,
                                                        int controller_number,
                                                        CONTROLLER_TYPE requested_type,
-                                                       uint8_t capabilities) {
+                                                       uint8_t capabilities,
+                                                       uint32_t support_button_flags) {
 
   auto on_rumble_fn = ([connected_client, controller_number, aes_key = session.aes_key](int low_freq, int high_freq) {
     auto rumble_pkt = ControlRumblePacket{
@@ -77,6 +78,18 @@ std::shared_ptr<events::JoypadTypes> create_new_joypad(const events::StreamSessi
       break;
     }
   }
+
+  // Auto-detect 8BitDo Ultimate 2: ARRIVAL fingerprint from packet analysis
+  // capabilities=0x73 (ANALOG_TRIGGERS|RUMBLE|ACCELEROMETER|GYRO|BATTERY)
+  // support_button_flags=0x0ff7ff00
+  if (final_type == wolf::config::ControllerType::AUTO &&
+      capabilities == 0x73 && support_button_flags == 0x0ff7ff00) {
+    logs::log(logs::info,
+              "Auto-detected 8BitDo Ultimate 2 for controller {} (caps=0x{:02x}, btn_flags=0x{:08x})",
+              controller_number, capabilities, support_button_flags);
+    final_type = wolf::config::ControllerType::ULTIMATE2;
+  }
+
   switch (final_type) {
   case wolf::config::ControllerType::AUTO:
   case wolf::config::ControllerType::XBOX: {
@@ -663,7 +676,8 @@ void controller_arrival(const CONTROLLER_ARRIVAL_PACKET &pkt,
                       connected_client,
                       pkt.controller_number,
                       (CONTROLLER_TYPE)pkt.controller_type,
-                      pkt.capabilities);
+                      pkt.capabilities,
+                      pkt.support_button_flags);
   }
 }
 
@@ -693,7 +707,7 @@ void controller_multi(const CONTROLLER_MULTI_PACKET &pkt,
     }
   } else {
     // Old Moonlight doesn't support CONTROLLER_ARRIVAL, we create a default pad when it's first mentioned
-    selected_pad = create_new_joypad(session, connected_client, pkt.controller_number, XBOX, ANALOG_TRIGGERS | RUMBLE);
+    selected_pad = create_new_joypad(session, connected_client, pkt.controller_number, XBOX, ANALOG_TRIGGERS | RUMBLE, 0);
   }
   if (selected_pad) {
     std::visit(
@@ -779,7 +793,6 @@ void controller_motion(const CONTROLLER_MOTION_PACKET &pkt, events::StreamSessio
         std::get<Ultimate2Joypad>(*selected_pad).set_motion(inputtino::Ultimate2Joypad::ACCELERATION, x, y, z);
       } else if (pkt.motion_type == GYROSCOPE) {
         std::get<Ultimate2Joypad>(*selected_pad).set_motion(inputtino::Ultimate2Joypad::GYROSCOPE, x, y, z);
-
       }
     }
   }
